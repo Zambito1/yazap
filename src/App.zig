@@ -3,6 +3,7 @@ const App = @This();
 const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const ArgMatches = @import("ArgMatches.zig");
 const Command = @import("Command.zig");
 const HelpMessageWriter = @import("HelpMessageWriter.zig");
@@ -13,6 +14,8 @@ const help_message_buffer_size = 4096;
 
 /// Top level allocator for the entire library.
 allocator: Allocator,
+/// Arena for `process_args`, as per `std.process.Args.toSlice` doc.
+arena: ?ArenaAllocator = null,
 /// Root command of the app.
 command: Command,
 /// Core structure containing parse result.
@@ -20,7 +23,7 @@ command: Command,
 /// It is not intended for direct access, use `ArgMatches` instead.
 parse_result: ?ParseResult = null,
 /// Raw buffer containing command line arguments.
-process_args: ?[]const [:0]u8 = null,
+process_args: ?[]const [:0]const u8 = null,
 
 /// Creates a new instance of `App`.
 ///
@@ -51,9 +54,8 @@ pub fn deinit(self: *App) void {
     if (self.parse_result) |*parse_result| {
         parse_result.deinit();
     }
-    if (self.process_args) |args| {
-        std.process.argsFree(self.allocator, args);
-    }
+    if (self.arena) |*arena|
+        arena.deinit();
     self.command.deinit();
     self.parse_result = null;
 }
@@ -105,8 +107,9 @@ pub fn rootCommand(self: *App) *Command {
 ///
 /// const matches = try app.parseProcess(io);
 /// ```
-pub fn parseProcess(self: *App, io: std.Io) YazapError!ArgMatches {
-    self.process_args = try std.process.argsAlloc(self.allocator);
+pub fn parseProcess(self: *App, io: std.Io, args: std.process.Args) YazapError!ArgMatches {
+    self.arena = .init(self.allocator);
+    self.process_args = try args.toSlice(self.arena.?.allocator());
     return self.parseFrom(io, self.process_args.?[1..]);
 }
 
