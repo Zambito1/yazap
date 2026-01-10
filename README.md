@@ -201,7 +201,7 @@ arguments, which can be useful during testing. Both functions returns
 [`ArgMatches`](/src/ArgMatches.zig).
 
 ```zig
-const matches = try app.parseProcess();
+const matches = try app.parseProcess(io, args);
 
 if (matches.containsArg("version")) {
     log.info("v0.1.0", .{});
@@ -300,7 +300,7 @@ update_cmd.setProperty(.help_on_empty_args);
 
 try myls.addSubcommand(update_cmd);
 
-const matches = try myls.parseProcess();
+const matches = try myls.parseProcess(io, args);
 
 // --snip--
 ```
@@ -313,11 +313,12 @@ const yazap = @import("yazap");
 
 const allocator = std.heap.page_allocator;
 const log = std.log;
+const Init = std.process.Init;
 const App = yazap.App;
 const Arg = yazap.Arg;
 
-pub fn main() anyerror!void {
-    var app = App.init(allocator, "myls", "My custom ls");
+pub fn main(init: Init) !void {
+    var app = App.init(init.gpa, "myls", "My custom ls");
     defer app.deinit();
 
     var myls = app.rootCommand();
@@ -363,7 +364,7 @@ pub fn main() anyerror!void {
     try myls.addSubcommand(update_cmd);
 
     // Get the parse result.
-    const matches = try app.parseProcess();
+    const matches = try app.parseProcess(init.io, init.minimal.args);
 
     if (matches.containsArg("version")) {
         log.info("v0.1.0", .{});
